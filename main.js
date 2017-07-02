@@ -30,7 +30,7 @@ var server = net.createServer(function(socket) {
             socket.end();
          }
          else if(objMsg.type == "command") {
-            console.log(objMsg);
+            //console.log(objMsg);
             objMsg.commands.forEach(function (cmd) {
                if(cmd.type == "rotate") {
                   var pawn = map.pawns.find(function (pawn) {
@@ -214,6 +214,15 @@ function facingOffset(facing) {
 
 setInterval(function() {
    console.log("Tick!");
+   // Update clients list
+   for(var i = clients.length - 1; i >= 0; i--) {
+      if(clients[i].socket.destroyed)
+      {
+         clients.splice(i, 1);
+      }
+   }
+
+
    // Proccess State
 
    map.pawns.forEach(function (pawn) {

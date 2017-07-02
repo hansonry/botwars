@@ -4,11 +4,22 @@ var net           = require('net'),
 
 var socket = net.createConnection(8000);
 var client = botwarsClient.create(socket, "hansonry", "1234");
+
+var rotate = false;
 client.on('turn', function(turn) {
    //console.log(turn.raw);
    var aPawn = turn.myPawns[0];
    console.log(aPawn);
-   turn.pawnMove(aPawn.id);
+
+   if(rotate) {
+      turn.pawnRotateRight(aPawn.id);
+      rotate = false;
+   }
+   else {
+      turn.pawnMove(aPawn.id);
+      rotate = true;
+   }
+
 
 
    turn.sendCommands();

@@ -16,10 +16,10 @@ function BotwarsTurn(msg, socket) {
 
    var command = {type: "command", commands: []};
 
-   this.pawnTurnLeft = function(id) {
+   this.pawnRotateLeft = function(id) {
       command.commands.push({type: "rotate", pawnId: id, direction: "left"});
    }
-   this.pawnTurnRight = function(id) {
+   this.pawnRotateRight = function(id) {
       command.commands.push({type: "rotate", pawnId: id, direction: "right"});
    }
    this.pawnMove = function(id) {
