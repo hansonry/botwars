@@ -30,6 +30,7 @@ var server = net.createServer(function(socket) {
             socket.end();
          }
          else if(objMsg.type == "command") {
+            console.log(objMsg);
             objMsg.commands.forEach(function (cmd) {
                if(cmd.type == "rotate") {
                   var pawn = map.pawns.find(function (pawn) {
@@ -137,8 +138,8 @@ function CreateSightArray(coords, radius) {
       var points = [];
       var min = {x: coords.x - radius, y: coords.y - radius};
       var size = radius * 2 + 1;
-      for(var x = min.x; x <= min.x + size; x ++) {
-         for(var y = min.y; y <= min.y + size; y ++) {
+      for(var x = min.x; x < min.x + size; x ++) {
+         for(var y = min.y; y < min.y + size; y ++) {
             points.push({x: x, y: y});
          }
       }

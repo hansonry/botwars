@@ -22,11 +22,13 @@ myCarrier.on('line', function(line) {
    else if(state.loggedIn == true) {
       // TODO: Proccess commands
       if(msg.type == "status") {
+         console.log("Line: " + line);
          msg.vision.forEach(function (pos) {
             if(pos.type == "pawn") {
                console.log(pos.pawn);
             }
          });
+         
       }
    }
 
