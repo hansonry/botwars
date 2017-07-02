@@ -1,4 +1,4 @@
-var Lazy = require('lazy'), net = require('net'), shortid = require('shortid');
+var carrier = require('carrier'), net = require('net'), shortid = require('shortid');
 
 // constants
 var serverTickMS = 500;
@@ -20,13 +20,14 @@ var server = net.createServer(function(socket) {
    thisClient.loggedIn = false;
    thisClient.socket = socket;
 
-   new Lazy(socket).lines.forEach(function(msg) {
-      var objMsg = JSON.parse(msg);
+   var thisCarrier = carrier.carry(socket);
+   thisCarrier.on('line', function(line) {
+      var objMsg = JSON.parse(line);
       if(thisClient.loggedIn) {
          if(objMsg.type == "signOut") {
             console.log("User Signed Out: " + thisClient.user.username);
             clients.splice(client.indexOf(thisClient), 1);
-            socket.disconnect();
+            socket.end();
          }
          else if(objMsg.type == "command") {
             objMsg.commands.forEach(function (cmd) {
@@ -81,7 +82,7 @@ var server = net.createServer(function(socket) {
             });
          }
          else {
-            socket.write(JSON.stringify({type : "result", result : "failure", code : 1, text : "Unknown Message Type"}));
+            socket.write(JSON.stringify({type : "result", result : "failure", code : 1, text : "Unknown Message Type"}) + "\n");
          }
       }
       else {
@@ -91,27 +92,35 @@ var server = net.createServer(function(socket) {
             thisUser.username = objMsg.username;
             thisUser.password = objMsg.password;
             console.log("Created user: " + objMsg.username);
-            socket.write(JSON.stringify({type: "result", result : "success"}));
-            map.pawns.push({id: shortid.generate(), owner: thisUser.username, x:0, y:0, facing:"north", health:10, view:2, command:{type: "none"}});
+            socket.write(JSON.stringify({type: "result", result : "success"}) + "\n");
+            map.pawns.push({id: shortid.generate(), owner: thisUser, x:0, y:0, facing:"north", health:10, view:2, command:{type: "none"}});
+            //console.log(map.pawns);
          }
          else if(objMsg.type == "signIn") {
-            var thisUser = users.find(function(username) {
-               return username == objMsg.username;
+            var thisUser = users.find(function(user) {
+               return user.username == objMsg.username;
             });
-            if(thisUser.password == objMsg.password) {
-               thisClient.user = thisUser;
-               thisClient.loggedIn = true;
-               console.log("User Signed In: " + objMsg.username);
-               socket.write(JSON.stringify({type: "result", result : "success"}));
+            if(thisUser == undefined) {
+               console.log("User " + objMsg.username + " not found");
+               //console.log(users);
+               socket.write(JSON.stringify({type: "result", result: "failure", reason: "Username not found"}) + "\n");
             }
             else {
-               console.log("User " + objMsg.username + " entered incorrect password");
-               socket.write(JSON.stringify({type: "result", result : "failure"}));
+               if(thisUser.password == objMsg.password) {
+                  thisClient.user = thisUser;
+                  thisClient.loggedIn = true;
+                  console.log("User Signed In: " + objMsg.username);
+                  socket.write(JSON.stringify({type: "result", result : "success"}) + "\n");
+               }
+               else {
+                  console.log("User " + objMsg.username + " entered incorrect password");
+                  socket.write(JSON.stringify({type: "result", result : "failure"}) + "\n");
+               }
             }
 
          }
          else {
-            socket.disconnect();
+            socket.end();
          }
       }
    });
@@ -125,7 +134,7 @@ function CreateSightArray(coords, radius) {
       return [{x: coords.x, y: coords.y}];
    }
    else {
-      var points = {};
+      var points = [];
       var min = {x: coords.x - radius, y: coords.y - radius};
       var size = radius * 2 + 1;
       for(var x = min.x; x <= min.x + size; x ++) {
@@ -233,10 +242,11 @@ setInterval(function() {
             vision: vision
          };
          map.pawns.forEach(function(pawn) {
-            if(pawn.user == client.user) {
+            if(pawn.owner == client.user) {
                myPawnList.push(pawn);
             }
          });
+         //console.log(myPawnList);
          myPawnList.forEach(function(pawn) {
             AddCoordSet(viewSet, CreateSightArray(pawn, pawn.view));
          });
@@ -245,7 +255,7 @@ setInterval(function() {
             map.pawns.forEach(function (pawn) {
                if(coord.x == pawn.x && coord.y == pawn.y) {
                   thisCoordObj.type = "pawn";
-                  thisCoordObj.pawn = {id: pawn.id, owner: pawn.owner, facing: pawn.facing, health: pawn.health};
+                  thisCoordObj.pawn = {id: pawn.id, ownerName: pawn.owner.username, facing: pawn.facing, health: pawn.health};
                }
 
             });
@@ -262,7 +272,8 @@ setInterval(function() {
             });
             vision.push(thisCoordObj);
          });
-         client.socket.write(JSON.stringify(clientMessage));
+         //console.log(vision);
+         client.socket.write(JSON.stringify(clientMessage) + "\n");
       }
    });
 }, serverTickMS);
