@@ -37,6 +37,9 @@ function BotwarsTurn(msg, socket) {
       command.commands.push({ type: "mine", pawnId: id});
 
    }
+   this.pawnBuild = function(id, buildingType) {
+      command.commands.push({ type: "build", pawnId: id, buildingType: buildingType });
+   }
 
    this.sendCommands = function() {
       socket.write(JSON.stringify(command) + "\n");
@@ -66,6 +69,18 @@ function BotwarsTurn(msg, socket) {
          }
       });
       return result;
+   }
+   this.oreCount = function(x, y, width, height) {
+      var count = 0;
+      for(var i = 0; i < msg.vision.length; i++) {
+         var vis = msg.vision[i];
+         if(vis.x >= x && vis.y >= y && 
+            vis.x < x + width && vis.y < y + height &&
+            vis.type == "item" && vis.item.type == "ore") {
+            count = count + vis.item.count;
+         }
+      }
+      return count;
    }
 }
 

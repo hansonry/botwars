@@ -12,7 +12,7 @@ var users = [];
 var map = {
    pawns     : [],
    terrain   : [],
-   ores      : [ { x: 0, y: -1, rate: 1, max: 100, value: 20 } ],
+   ores      : [ { x: 0, y: -1, rate: 1, max: 100, value: 50 } ],
    items     : [],
    buildings : []
 };
@@ -332,7 +332,8 @@ setInterval(function() {
    for(var i = 0; i < map.buildings.length; i++) {
       var building = map.buildings[i];
       if(building.type == "solar1") {
-         var eles = listAllInArea(target.x, target.y, 1, 1);
+         var eles = listAllInArea(building.x, building.y, 1, 1);
+         //TODO: Create Batteries
       }
    }
 
@@ -444,7 +445,7 @@ setInterval(function() {
             // Create Building
             var building = { type: pawn.command.buildingType, x: target.x, y: target.y, owner: pawn.owner };
 
-            if(building == "solar1") {
+            if(building.type == "solar1") {
                building.view   = 1;
                building.health = 10;
             }
@@ -486,7 +487,7 @@ setInterval(function() {
          };
 
          for(k = 0; k < map.pawns.length; k++) {
-            var pawn = map.pawns[i];
+            var pawn = map.pawns[k];
             if(pawn.owner == client.user) {
                var rect = viewToRect(pawn.x, pawn.y, pawn.view);
                addAreaToSet(viewSet, listAllInArea(rect.x, rect.y, rect.width, rect.height));
@@ -494,7 +495,7 @@ setInterval(function() {
             }
          }
          for(k = 0; k < map.buildings.length; k++) {
-            var building = map.buildings[i];
+            var building = map.buildings[k];
             if(building.owner == client.user) {
                var rect = viewToRect(building.x, building.y, building.view);
                addAreaToSet(viewSet, listAllInArea(rect.x, rect.y, rect.width, rect.height));
@@ -526,7 +527,7 @@ setInterval(function() {
                   count: ele.item.count
                };
             }
-            else if(elel.type == "building") {
+            else if(ele.type == "building") {
                thisCoordObj.building = {
                   type:      ele.building.type,
                   view:      ele.building.view,

@@ -8,6 +8,7 @@ var client = botwarsClient.create(socket, "hansonry", "1234");
 var rotate = false;
 client.on('turn', function(turn) {
    console.log(JSON.stringify(turn.raw));
+   console.log();
    var aPawn = turn.myPawns[0];
    //console.log(aPawn);
 
@@ -21,7 +22,22 @@ client.on('turn', function(turn) {
       rotate = true;
    }
    */
-   turn.pawnMine(aPawn.id);
+
+   var oc = turn.oreCount(0, -1, 1, 1) 
+
+   if(oc < 50) {
+      turn.pawnMine(aPawn.id);
+   }
+   else {
+      if(aPawn.facing == "north") {
+         turn.pawnRotateRight(aPawn.id);
+      }
+      else {
+         turn.pawnBuild(aPawn.id, "solar1");        
+      }
+   }
+
+   console.log("Ore Count: " + turn.oreCount(0, -1, 1, 1));
 
    turn.sendCommands();
 });
