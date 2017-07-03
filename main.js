@@ -18,7 +18,19 @@ var map = {
 };
 
 var buildingPrices = {
-   solar1: 50
+   smallSolar   : 50,
+   smallFactory : 100,
+   smallStorage : 100,
+};
+
+var actionCosts = {
+   rotate   : 1,
+   move     : 5,
+   mine     : 10,
+   build    : 20,
+   pickup   : 2,
+   drop     : 2,
+   activate : 10
 };
 
 
@@ -53,44 +65,44 @@ var server = net.createServer(function(socket) {
                   var pawn = findPawnById(cmd.pawnId);
                   if(pawn != undefined) {
                      if(cmd.direction == "left") {
-                        pawn.command = {type: "rotate", direction: "left"};
+                        pawn.command = { type: "rotate", direction: "left" };
                      }
                      else if(cmd.direction == "right") {
-                        pawn.command = {type: "rotate", direction: "right"};
+                        pawn.command = { type: "rotate", direction: "right" };
                      }
                      else {
-                        pawn.command = {type: "none"};
+                        pawn.command = { type: "none" };
                      }
                   }
                }
                else if(cmd.type == "move") {
                   var pawn = findPawnById(cmd.pawnId);
                   if(pawn != undefined) {
-                     pawn.command = {type: "move"};
+                     pawn.command = { type: "move" };
                   }
                }
                else if(cmd.type == "none") {
                   var pawn = findPawnById(cmd.pawnId);
                   if(pawn != undefined) {
-                     pawn.command = {type: "none"};
+                     pawn.command = { type: "none" };
                   }
                }
                else if(cmd.type == "pickup") {
                   var pawn = findPawnById(cmd.pawnId);
                   if(pawn != undefined) {
-                     pawn.command = {type: "pickup"};
+                     pawn.command = { type: "pickup" };
                   }
                }
                else if(cmd.type == "drop") {
                   var pawn = findPawnById(cmd.pawnId);
                   if(pawn != undefined) {
-                     pawn.command = {type: "drop"};
+                     pawn.command = { type: "drop" };
                   }
                }
                else if(cmd.type == "mine") {
                   var pawn = findPawnById(cmd.pawnId);
                   if(pawn != undefined) {
-                     pawn.command = {type: "mine"};
+                     pawn.command = { type: "mine" };
                   }
                }
                else if(cmd.type == "build") {
@@ -98,7 +110,12 @@ var server = net.createServer(function(socket) {
                   if(pawn != undefined) {
                      pawn.command = { type: "build", buildingType: cmd.buildingType };
                   }
-
+               }
+               else if(cmd.type == "activate") {
+                  var pawn = findPawnById(cmd.pawnId);
+                  if(pawn != undefined) {
+                     pawn.command = { type: "activate" };
+                  }
                }
             });
          }
@@ -116,7 +133,8 @@ var server = net.createServer(function(socket) {
             console.log("Created user: " + objMsg.username);
             socket.write(JSON.stringify({type: "result", result : "success"}) + "\n");
             map.pawns.push({id: shortid.generate(), owner: thisUser, x:0, y:0, 
-               facing: "north", health:10, view:2, 
+               facing: "north", health:10, view:2, storageType: "none", 
+               storageCount: 0, storageMax: 100, charge: 100, chargeMax: 100, 
                command: { type: "none" } });
             //console.log(map.pawns);
          }
@@ -284,7 +302,8 @@ function listAllInArea(x, y, width, height) {
       var building = map.buildings[i];
       if(building.x >= x && building.y >= y &&
          building.x < x + width && building.y < y + height) {
-         list.push({ type: "building", x: building.x, y: building.y, index: i, building: building });
+         list.push({ type: "building", x: building.x, y: building.y, index: i, 
+                     building: building });
       }
    }
    return list;
@@ -331,9 +350,32 @@ setInterval(function() {
    // Update Buildings
    for(var i = 0; i < map.buildings.length; i++) {
       var building = map.buildings[i];
-      if(building.type == "solar1") {
+      if(building.type == "smallSolar") {
          var eles = listAllInArea(building.x, building.y, 1, 1);
-         //TODO: Create Batteries
+         var item = undefined;
+         var otherItem = false;
+         for(k = 0; k < eles.length; k++) {
+            if(eles[k].type == "item") {
+               if(eles[k].item.type == "battery") {
+                  item = eles[k].item;
+                  break;
+               }
+               else {
+                  otherItem = true;
+                  break;
+               }
+            }
+         }
+
+         if(otherItem == false) {
+            if(item == undefined) {
+               map.items.push({ x: building.x, y: building.y, type: "battery", 
+                  count: building.rate });
+            }
+            else {
+               item.count = item.count + building.rate;
+            }
+         }
       }
    }
 
@@ -343,12 +385,24 @@ setInterval(function() {
    for(var i = 0; i < map.pawns.length; i++) {
       var pawn = map.pawns[i];
       if(pawn.command.type == "rotate") {
-         pawn.facing = rotate(pawn.facing, pawn.command.direction);
+         if(pawn.charge < actionCosts.rotate) {
+            pawn.charge = 0;
+         }
+         else {
+            pawn.facing = rotate(pawn.facing, pawn.command.direction);
+            pawn.charge = pawn.charge - actionCosts.rotate;
+         }
       }
       else if(pawn.command.type == "move") {
-         var offset = facingOffset(pawn.facing);
-         pawn.x = pawn.x + offset.x;
-         pawn.y = pawn.y + offset.y;
+         if(pawn.charge < actionCosts.move) {
+            pawn.charge = 0;
+         }
+         else {
+            var offset = facingOffset(pawn.facing);
+            pawn.x = pawn.x + offset.x;
+            pawn.y = pawn.y + offset.y;
+            pawn.charge = pawn.charge - actionCosts.move;
+         }
 
       }
       else if(pawn.command.type == "mine") {
@@ -375,28 +429,34 @@ setInterval(function() {
          }
 
          if(mined > 0) {
-            var item = undefined;
-            var otherItem = false;
-            for(var k = 0; k < eles.length; k++) {
-               if(eles[k].type == "item") {
-                  if(eles[k].item.type == "ore") {
-                     item = eles[k].item;
-                     break;
+            if(pawn.charge < actionCosts.mine) {
+               pawn.charge = 0;
+            }
+            else {
+               var item = undefined;
+               var otherItem = false;
+               for(var k = 0; k < eles.length; k++) {
+                  if(eles[k].type == "item") {
+                     if(eles[k].item.type == "ore") {
+                        item = eles[k].item;
+                        break;
+                     }
+                     else {
+                        otherItem = true;
+                        break;
+                     }
+                  }
+               }
+               if(otherItem == false)
+               {
+                  if(item == undefined) {
+                     map.items.push({ x: target.x, y: target.y, type: "ore", count: mined });
                   }
                   else {
-                     otherItem = true;
-                     break;
+                     item.count = item.count + mined;
                   }
                }
-            }
-            if(otherItem == false)
-            {
-               if(item == undefined) {
-                  map.items.push({ x: target.x, y: target.y, type: "ore", count: mined });
-               }
-               else {
-                  item.count = item.count + mined;
-               }
+               pawn.charge = pawn.charge - actionCosts.mine;
             }
          }
       }
@@ -412,45 +472,126 @@ setInterval(function() {
          var oreList = [];
          var oreValue = 0;
          var areaClear = true;
-         for(var i = 0; i < eles.length; i++) {
-            if(eles[i].type == "building" && eles[i].x == target.x && eles[i].y == target.y) {
+         for(var k = 0; k < eles.length; k++) {
+            if(eles[k].type == "building" && eles[k].x == target.x && eles[k].y == target.y) {
                areaClear = false;
             }
-            else if(eles[i].type == "item" && eles[i].item.type == "ore") {
-               oreList.push(eles[i]);
-               oreValue = oreValue + eles[i].item.count;
+            else if(eles[k].type == "item" && eles[k].item.type == "ore") {
+               oreList.push(eles[k]);
+               oreValue = oreValue + eles[k].item.count;
             }
          }
          var cost = buildingPrices[pawn.command.buildingType];
 
          if(areaClear && oreValue >= cost) {
-            // remove Ore
-            for(var i = 0; i < oreList.length; i++) {
-               if(oreList[i].item.count >= cost) {
-                  oreList[i].item.count = oreList[i].item.count - cost;
-                  cost = 0;
-               }
-               else {
-                  cost = cost - oreList[i].item.count;
-                  oreList[i].item.count = 0;
-                  
-               }
-               if(oreList[i].item.count <= 0) {
-                  map.items.splice(oreList[i].index, 1);
-               }
-               if(cost <= 0) {
-                  break;
-               }
+            if(pawn.charge < actionCosts.build) {
+               pawn.charge = 0;
             }
-            // Create Building
-            var building = { type: pawn.command.buildingType, x: target.x, y: target.y, owner: pawn.owner };
+            else {
+               // remove Ore
+               for(var k = 0; k < oreList.length; k++) {
+                  if(oreList[k].item.count >= cost) {
+                     oreList[k].item.count = oreList[k].item.count - cost;
+                     cost = 0;
+                  }
+                  else {
+                     cost = cost - oreList[k].item.count;
+                     oreList[k].item.count = 0;
+                     
+                  }
+                  if(oreList[k].item.count <= 0) {
+                     map.items.splice(oreList[k].index, 1);
+                  }
+                  if(cost <= 0) {
+                     break;
+                  }
+               }
+               // Create Building
+               var building = { type: pawn.command.buildingType, 
+                                x: target.x, y: target.y, owner: pawn.owner };
 
-            if(building.type == "solar1") {
-               building.view   = 1;
-               building.health = 10;
+               if(building.type == "smallSolar") {
+                  building.view   = 1;
+                  building.health = 10;
+                  building.rate   = 2;
+               }
+               else if(building.type == "smallFactory") {
+                  building.view   = 1;
+                  building.health = 10;
+                  building.cost   = 100;
+               }
+               map.buildings.push(building);
+               pawn.charge = pawn.charge - actionCosts.build;
+
             }
-            map.buildings.push(building);
+         }
+      }
+      else if(pawn.command.type == "activate") {
+         var offset = facingOffset(pawn.facing);
+         var target = {
+            x: pawn.x + offset.x,
+            y: pawn.y + offset.y
+         };
+         var eles = listAllInArea(target.x, target.y, 1, 1);
+         var building = undefined;
+         for(var k = 0; k < eles.length; k++) {
+            if(eles[k].type == "building") {
+               building = eles[k].building;
+               break;
+            }
+         }
+        
 
+         if(building != undefined && building.type == "smallFactory" ) {
+            if(pawn.charge < actionCosts.activate) {
+               pawn.charge = 0;
+            }
+            else {
+               var rect = viewToRect(building.x, building.y, 1);
+               var eles = listAllInArea(rect.x, rect.y, rect.width, rect.height);
+               var oreList = [];
+               var oreValue = 0;
+               var areaClear = true;
+               for(var k = 0; k < eles.length; k++) {
+                  if(eles[k].type == "pawn" && eles[k].x == target.x && eles[k].y == target.y) {
+                     areaClear = false;
+                  }
+                  else if(eles[k].type == "item" && eles[k].item.type == "ore") {
+                     oreList.push(eles[k]);
+                     oreValue = oreValue + eles[k].item.count;
+                  }
+               }
+               var cost = building.cost;
+
+               if(areaClear && oreValue >= cost) {
+                  // remove Ore
+                  for(var k = 0; k < oreList.length; k++) {
+                     if(oreList[k].item.count >= cost) {
+                        oreList[k].item.count = oreList[k].item.count - cost;
+                        cost = 0;
+                     }
+                     else {
+                        cost = cost - oreList[k].item.count;
+                        oreList[k].item.count = 0;
+                        
+                     }
+                     if(oreList[k].item.count <= 0) {
+                        map.items.splice(oreList[k].index, 1);
+                     }
+                     if(cost <= 0) {
+                        break;
+                     }
+                  }
+                  // Create New Pawn
+                  map.pawns.push({ id: shortid.generate(), owner: building.owner, 
+                                   x: building.x, y: building.y, 
+                                   facing: pawn.facing, health:10, view:2, 
+                                   storageType: "none", storageCount: 0,
+                                   storageMax: 100, charge: 100, chargeMax: 100, 
+                                   command: { type: "none" } });
+               }
+               pawn.charge = pawn.charge - actionCosts.activate;
+            }
          }
       }
 
@@ -507,11 +648,16 @@ setInterval(function() {
             var thisCoordObj = { x: ele.x, y: ele.y, type : ele.type };
             if(ele.type == "pawn") {
                thisCoordObj.pawn = {
-                  id:        ele.pawn.id, 
-                  ownerName: ele.pawn.owner.username, 
-                  facing:    ele.pawn.facing,
-                  health:    ele.pawn.health,
-                  view:      ele.pawn.view
+                  id:           ele.pawn.id, 
+                  ownerName:    ele.pawn.owner.username, 
+                  facing:       ele.pawn.facing,
+                  health:       ele.pawn.health,
+                  view:         ele.pawn.view,
+                  storageType:  ele.pawn.storageType,
+                  storageCount: ele.pawn.storageCount,
+                  storageMax:   ele.pawn.storageMax,
+                  charge:       ele.pawn.charge,
+                  chargeMax:    ele.pawn.chargeMax
                };               
             }
             else if(ele.type == "ore") {
@@ -534,6 +680,9 @@ setInterval(function() {
                   health:    ele.building.health,
                   ownerName: ele.building.owner.username
                };
+               if(thisCoordObj.building.type == "smallFactory") {
+                  thisCoordObj.building.cost = ele.building.cost;
+               }
             }
             
 

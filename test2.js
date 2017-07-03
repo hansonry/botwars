@@ -33,7 +33,7 @@ client.on('turn', function(turn) {
          turn.pawnRotateRight(aPawn.id);
       }
       else {
-         turn.pawnBuild(aPawn.id, "solar1");        
+         turn.pawnBuild(aPawn.id, "smallSolar");        
       }
    }
 
