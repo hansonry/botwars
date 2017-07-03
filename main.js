@@ -1,4 +1,6 @@
-var carrier = require('carrier'), net = require('net'), shortid = require('shortid');
+var carrier = require('carrier'), 
+    net     = require('net'), 
+    shortid = require('shortid');
 
 // constants
 var serverTickMS = 500;
@@ -8,11 +10,21 @@ var serverTickMS = 500;
 var clients = [];
 var users = [];
 var map = {
-   pawns : [],
-   walls : [],
-   ores  : []
+   pawns   : [],
+   terrain : [],
+   ores    : [{x: 0, y: -1, rate: 1, max: 100, value: 20 }],
+   items   : []
 };
 
+
+function findPawnById(pawnId) {
+   for(var i = 0; i < map.pawns.length; i++) {
+      if(map.pawns[i].id == pawnId) {
+         return map.pawns[i];
+      }
+   }
+   return undefined;
+}
 
 var server = net.createServer(function(socket) {
    var thisClient = {}
@@ -33,9 +45,7 @@ var server = net.createServer(function(socket) {
             //console.log(objMsg);
             objMsg.commands.forEach(function (cmd) {
                if(cmd.type == "rotate") {
-                  var pawn = map.pawns.find(function (pawn) {
-                     return pawn.id == cmd.pawnId;
-                  });
+                  var pawn = findPawnById(cmd.pawnId);
                   if(pawn != undefined) {
                      if(cmd.direction == "left") {
                         pawn.command = {type: "rotate", direction: "left"};
@@ -49,41 +59,40 @@ var server = net.createServer(function(socket) {
                   }
                }
                else if(cmd.type == "move") {
-                  var pawn = map.pawns.find(function (pawn) {
-                     return pawn.id == cmd.pawnId;
-                  });
+                  var pawn = findPawnById(cmd.pawnId);
                   if(pawn != undefined) {
                      pawn.command = {type: "move"};
                   }
                }
                else if(cmd.type == "none") {
-                  var pawn = map.pawns.find(function (pawn) {
-                     return pawn.id == cmd.pawnId;
-                  });
+                  var pawn = findPawnById(cmd.pawnId);
                   if(pawn != undefined) {
                      pawn.command = {type: "none"};
                   }
                }
                else if(cmd.type == "pickup") {
-                  var pawn = map.pawns.find(function (pawn) {
-                     return pawn.id == cmd.pawnId;
-                  });
+                  var pawn = findPawnById(cmd.pawnId);
                   if(pawn != undefined) {
                      pawn.command = {type: "pickup"};
                   }
                }
                else if(cmd.type == "drop") {
-                  var pawn = map.pawns.find(function (pawn) {
-                     return pawn.id == cmd.pawnId;
-                  });
+                  var pawn = findPawnById(cmd.pawnId);
                   if(pawn != undefined) {
                      pawn.command = {type: "drop"};
+                  }
+               }
+               else if(cmd.type == "mine") {
+                  var pawn = findPawnById(cmd.pawnId);
+                  if(pawn != undefined) {
+                     pawn.command = {type: "mine"};
                   }
                }
             });
          }
          else {
-            socket.write(JSON.stringify({type : "result", result : "failure", code : 1, text : "Unknown Message Type"}) + "\n");
+            socket.write(JSON.stringify({type : "result", result : "failure", 
+               code : 1, text : "Unknown Message Type"}) + "\n");
          }
       }
       else {
@@ -94,7 +103,9 @@ var server = net.createServer(function(socket) {
             thisUser.password = objMsg.password;
             console.log("Created user: " + objMsg.username);
             socket.write(JSON.stringify({type: "result", result : "success"}) + "\n");
-            map.pawns.push({id: shortid.generate(), owner: thisUser, x:0, y:0, facing:"north", health:10, view:2, command:{type: "none"}});
+            map.pawns.push({id: shortid.generate(), owner: thisUser, x:0, y:0, 
+               facing: "north", health:10, view:2, 
+               command: { type: "none" } });
             //console.log(map.pawns);
          }
          else if(objMsg.type == "signIn") {
@@ -212,20 +223,97 @@ function facingOffset(facing) {
    return result;
 }
 
+function viewToRect(x, y, view) {
+   return {
+      x:      x - view,
+      y:      y - view,
+      width:  view * 2 + 1,
+      height: view * 2 + 1
+   };
+}
+
+function listAllInArea(x, y, width, height) {
+   if(width <= 0 || height <= 0) {
+      return [];
+   }
+   var list = [];
+   for(var i = 0; i < map.pawns.length; i++) {
+      var pawn = map.pawns[i];
+      if(pawn.x >= x && pawn.y >= y &&
+         pawn.x < x + width && pawn.y < y + height) {
+         list.push({ type:"pawn", x: pawn.x, y: pawn.y, pawn: pawn });
+      }
+   }
+
+   for(var i = 0; i < map.terrain.length; i++) {
+      var terr = map.terrain[i];
+      if(terr.x >= x && terr.y >= y &&
+         terr.x < x + width && terr.y < y + height) {
+         list.push({ type:"terrain", x: terr.x, y: terr.y, terrain: terr });
+      }
+   }
+
+   for(var i = 0; i < map.ores.length; i++) {
+      var ore = map.ores[i];
+      if(ore.x >= x && ore.y >= y &&
+         ore.x < x + width && ore.y < y + height) {
+         list.push({ type: "ore", x: ore.x, y: ore.y, ore: ore });
+      }
+   }
+
+   for(var i = 0; i < map.items.length; i++) {
+      var item = map.items[i];
+      if(item.x >= x && item.y >= y &&
+         item.x < x + width && item.y < y + height) {
+         list.push({ type: "item", x: item.x, y: item.y, item: item });
+      }
+   }
+   return list;
+}
+
+function addAreaToSet(set, area) {
+   for(var i = 0; i < area.length; i++) {
+      var found = false;
+      for(var k = 0; k < set.length; k++) {
+         if(area[i].type == set[k].type && 
+            area[i].x    == set[k].x && 
+            area[i].y    == set[k].y) {
+            found = true;
+            break;
+         }
+      }
+      if(found == false) {
+         set.push(area[i]);
+      }
+   }
+}
+
 setInterval(function() {
-   console.log("Tick!");
+   //console.log("Tick!");
    // Update clients list
    for(var i = clients.length - 1; i >= 0; i--) {
       if(clients[i].socket.destroyed)
       {
+         console.log("User Signed Out: " + clients[i].user.username);
          clients.splice(i, 1);
+      }
+   }
+
+   // Update Ores
+
+   for(var i = 0; i < map.ores.length; i++) {
+      var ore = map.ores[i];
+      ore.value = ore.value + ore.rate;
+      if(ore.value > ore.max) {
+         ore.value = ore.max;
       }
    }
 
 
    // Proccess State
 
-   map.pawns.forEach(function (pawn) {
+   for(var i = 0; i < map.pawns.length; i++) {
+      var pawn = map.pawns[i];
       if(pawn.command.type == "rotate") {
          pawn.facing = rotate(pawn.facing, pawn.command.direction);
       }
@@ -235,9 +323,65 @@ setInterval(function() {
          pawn.y = pawn.y + offset.y;
 
       }
+      else if(pawn.command.type == "mine") {
+         var offset = facingOffset(pawn.facing);
+         var target = {
+            x: pawn.x + offset.x,
+            y: pawn.y + offset.y
+         };
+         var eles = listAllInArea(target.x, target.y, 1, 1);
+         var mined = 0;
+         var mineAblity = 10;
+         for(var k = 0; k < eles.length; k++) {
+            if(eles[k].type == "ore") {
+               if(eles[k].ore.value >= mineAblity) {
+                  mined = mineAblity;
+               }
+               else {
+                  mined = eles[k].ore.value;
+               }
+               eles[k].ore.value = eles[k].ore.value - mined;
+
+               break;
+            }
+         }
+
+         if(mined > 0) {
+            var item = undefined;
+            for(var k = 0; k < eles.length; k++) {
+               if(eles[k].type == "item") {
+                  item = eles[k].item;
+                  break;
+               }
+            }
+            if(item == undefined) {
+               map.items.push({ x: target.x, y: target.y, count: mined });
+            }
+            else {
+               item.count = item.count + mined;
+            }
+         }
+      }
 
       pawn.command = {type: "none"};
-   });
+
+   }
+
+   // Decay Items
+   var maxItemCount = 100;
+   var itemDecayRate = 5;
+   for(var i = 0; i < map.items.length; i++) {
+      var item = map.items[i];
+      if(item.count > maxItemCount) {
+         if(item.count - itemDecayRate < maxItemCount) {
+            item.count = maxItemCount;
+         }
+         else {
+            item.count = item.count - itemDecayRate;
+         }
+
+      }
+   }
 
    // Send Results
    clients.forEach(function(client) {
@@ -258,28 +402,35 @@ setInterval(function() {
          });
          //console.log(myPawnList);
          myPawnList.forEach(function(pawn) {
-            AddCoordSet(viewSet, CreateSightArray(pawn, pawn.view));
+            var rect = viewToRect(pawn.x, pawn.y, pawn.view);
+            addAreaToSet(viewSet, listAllInArea(rect.x, rect.y, rect.width, rect.height));
          });
-         viewSet.forEach(function (coord){
-            var thisCoordObj = {x: coord.x, y: coord.y, type : "none"};
-            map.pawns.forEach(function (pawn) {
-               if(coord.x == pawn.x && coord.y == pawn.y) {
-                  thisCoordObj.type = "pawn";
-                  thisCoordObj.pawn = {id: pawn.id, ownerName: pawn.owner.username, facing: pawn.facing, health: pawn.health};
-               }
 
-            });
-            map.walls.forEach(function (wall) {
-               if(coord.x == wall.x && coord.y == wall.y) {
-                  thisCoordObj.type = "wall";
-               }               
-            });
-            map.ores.forEach(function (ore) {
-               if(coord.x == ore.x && coord.y == ore.y) {
-                  thisCoordObj.type = "ore";
-               }
-               
-            });
+         viewSet.forEach(function (ele) {
+            var thisCoordObj = { x: ele.x, y: ele.y, type : ele.type };
+            if(ele.type == "pawn") {
+               thisCoordObj.pawn = {
+                  id:        ele.pawn.id, 
+                  ownerName: ele.pawn.owner.username, 
+                  facing:    ele.pawn.facing,
+                  health:    ele.pawn.health,
+                  view:      ele.pawn.view
+               };               
+            }
+            else if(ele.type == "ore") {
+               thisCoordObj.ore = {
+                  value: ele.ore.value,
+                  rate:  ele.ore.rate,
+                  max:   ele.ore.max
+               };
+            }
+            else if(ele.type == "item") {
+               thisCoordObj.item = {
+                  count: ele.item.count
+               };
+            }
+            
+
             vision.push(thisCoordObj);
          });
          //console.log(vision);

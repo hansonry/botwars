@@ -2,6 +2,14 @@ var util    = require('util'),
     events  = require('events'), 
     carrier = require('carrier');
 
+function viewToRect(x, y, view) {
+   return {
+      x:      x - view,
+      y:      y - view,
+      width:  view * 2 + 1,
+      height: view * 2 + 1
+   };
+}
 
 function BotwarsTurn(msg, socket) {
    var self = this;
@@ -9,21 +17,25 @@ function BotwarsTurn(msg, socket) {
    this.myPawns = [];
    msg.vision.forEach(function(spot) {
       if(spot.type == "pawn" && spot.pawn.ownerName == msg.username) {
-         self.myPawns.push({id: spot.pawn.id, x: spot.x, y: spot.y, 
-            facing: spot.pawn.facing, health: spot.pawn.health});
+         var pawn = Object.assign({x: spot.x, y: spot.y}, spot.pawn);
+         self.myPawns.push(pawn);
       }
    });
 
    var command = {type: "command", commands: []};
 
    this.pawnRotateLeft = function(id) {
-      command.commands.push({type: "rotate", pawnId: id, direction: "left"});
+      command.commands.push({ type: "rotate", pawnId: id, direction: "left" });
    }
    this.pawnRotateRight = function(id) {
-      command.commands.push({type: "rotate", pawnId: id, direction: "right"});
+      command.commands.push({ type: "rotate", pawnId: id, direction: "right" });
    }
    this.pawnMove = function(id) {
-      command.commands.push({type: "move", pawnId: id});
+      command.commands.push({ type: "move", pawnId: id });
+   }
+   this.pawnMine = function(id) {
+      command.commands.push({ type: "mine", pawnId: id});
+
    }
 
    this.sendCommands = function() {
@@ -39,13 +51,17 @@ function BotwarsTurn(msg, socket) {
       msg.vision.forEach(function(spot) {
          if(spot.x == x && spot.y == y) {
             result.visable = true;
-            if(type == "pawn") {
-               result.things.push({type: "pawn", id: spot.pawn.id, 
-                  ownerName: spot.pawn.ownerName, facing: spot.pawn.facing, 
-                  health: spot.pawn.health});
-            }
-            else if(type == "wall") {
-               result.things.push({type: "wall"});
+            result.things.push(spot);
+         }
+         if(result.visable == false) {
+            for(var k = 0; k < self.myPawns.length; k++) {
+               var pawn = self.myPawns[k];
+               var rect = viewToRect(pawn.x, pawn.y, pawn.view);
+               if(x >= rect.x && y >= rect.y && 
+                  x < rect.x + rect.width && y < rect.y + rect.height) {
+                  result.visable = true;
+                  break;
+               }
             }
          }
       });
