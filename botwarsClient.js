@@ -40,6 +40,22 @@ function BotwarsTurn(msg, socket) {
    this.pawnBuild = function(id, buildingType) {
       command.commands.push({ type: "build", pawnId: id, buildingType: buildingType });
    }
+   
+   this.pawnActivate = function(id) {
+      command.commands.push({ type: "activate", pawnId: id });
+   }
+
+   this.pawnPickup = function(id, amount) {
+      command.commands.push({ type: "pickup", pawnId: id, amount: amount });
+   }
+
+   this.pawnDrop = function(id, amount) {
+      command.commands.push({ type: "drop", pawnId: id, amount: amount });
+   }
+
+   this.pawnCharge = function(id) {
+      command.commands.push({ type: "charge", pawnId: id });
+   }
 
    this.sendCommands = function() {
       socket.write(JSON.stringify(command) + "\n");
