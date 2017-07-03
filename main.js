@@ -10,10 +10,15 @@ var serverTickMS = 500;
 var clients = [];
 var users = [];
 var map = {
-   pawns   : [],
-   terrain : [],
-   ores    : [{x: 0, y: -1, rate: 1, max: 100, value: 20 }],
-   items   : []
+   pawns     : [],
+   terrain   : [],
+   ores      : [ { x: 0, y: -1, rate: 1, max: 100, value: 20 } ],
+   items     : [],
+   buildings : []
+};
+
+var buildingPrices = {
+   solar1: 50
 };
 
 
@@ -87,6 +92,13 @@ var server = net.createServer(function(socket) {
                   if(pawn != undefined) {
                      pawn.command = {type: "mine"};
                   }
+               }
+               else if(cmd.type == "build") {
+                  var pawn = findPawnById(cmd.pawnId);
+                  if(pawn != undefined) {
+                     pawn.command = { type: "build", buildingType: cmd.buildingType };
+                  }
+
                }
             });
          }
@@ -241,7 +253,7 @@ function listAllInArea(x, y, width, height) {
       var pawn = map.pawns[i];
       if(pawn.x >= x && pawn.y >= y &&
          pawn.x < x + width && pawn.y < y + height) {
-         list.push({ type:"pawn", x: pawn.x, y: pawn.y, pawn: pawn });
+         list.push({ type:"pawn", x: pawn.x, y: pawn.y, index: i, pawn: pawn });
       }
    }
 
@@ -249,7 +261,7 @@ function listAllInArea(x, y, width, height) {
       var terr = map.terrain[i];
       if(terr.x >= x && terr.y >= y &&
          terr.x < x + width && terr.y < y + height) {
-         list.push({ type:"terrain", x: terr.x, y: terr.y, terrain: terr });
+         list.push({ type:"terrain", x: terr.x, y: terr.y, index: i, terrain: terr });
       }
    }
 
@@ -257,7 +269,7 @@ function listAllInArea(x, y, width, height) {
       var ore = map.ores[i];
       if(ore.x >= x && ore.y >= y &&
          ore.x < x + width && ore.y < y + height) {
-         list.push({ type: "ore", x: ore.x, y: ore.y, ore: ore });
+         list.push({ type: "ore", x: ore.x, y: ore.y, index: i, ore: ore });
       }
    }
 
@@ -265,7 +277,14 @@ function listAllInArea(x, y, width, height) {
       var item = map.items[i];
       if(item.x >= x && item.y >= y &&
          item.x < x + width && item.y < y + height) {
-         list.push({ type: "item", x: item.x, y: item.y, item: item });
+         list.push({ type: "item", x: item.x, y: item.y, index: i, item: item });
+      }
+   }
+   for(var i = 0; i < map.buildings.length; i++) {
+      var building = map.buildings[i];
+      if(building.x >= x && building.y >= y &&
+         building.x < x + width && building.y < y + height) {
+         list.push({ type: "building", x: building.x, y: building.y, index: i, building: building });
       }
    }
    return list;
@@ -309,6 +328,14 @@ setInterval(function() {
       }
    }
 
+   // Update Buildings
+   for(var i = 0; i < map.buildings.length; i++) {
+      var building = map.buildings[i];
+      if(building.type == "solar1") {
+         var eles = listAllInArea(target.x, target.y, 1, 1);
+      }
+   }
+
 
    // Proccess State
 
@@ -348,18 +375,81 @@ setInterval(function() {
 
          if(mined > 0) {
             var item = undefined;
+            var otherItem = false;
             for(var k = 0; k < eles.length; k++) {
                if(eles[k].type == "item") {
-                  item = eles[k].item;
+                  if(eles[k].item.type == "ore") {
+                     item = eles[k].item;
+                     break;
+                  }
+                  else {
+                     otherItem = true;
+                     break;
+                  }
+               }
+            }
+            if(otherItem == false)
+            {
+               if(item == undefined) {
+                  map.items.push({ x: target.x, y: target.y, type: "ore", count: mined });
+               }
+               else {
+                  item.count = item.count + mined;
+               }
+            }
+         }
+      }
+      else if(pawn.command.type == "build") {
+         var offset = facingOffset(pawn.facing);
+         var target = {
+            x: pawn.x + offset.x,
+            y: pawn.y + offset.y
+         };
+         var searchRect = viewToRect(target.x, target.y, 1);
+         var eles = listAllInArea(searchRect.x, searchRect.y, 
+                                  searchRect.width, searchRect.height);
+         var oreList = [];
+         var oreValue = 0;
+         var areaClear = true;
+         for(var i = 0; i < eles.length; i++) {
+            if(eles[i].type == "building" && eles[i].x == target.x && eles[i].y == target.y) {
+               areaClear = false;
+            }
+            else if(eles[i].type == "item" && eles[i].item.type == "ore") {
+               oreList.push(eles[i]);
+               oreValue = oreValue + eles[i].item.count;
+            }
+         }
+         var cost = buildingPrices[pawn.command.buildingType];
+
+         if(areaClear && oreValue >= cost) {
+            // remove Ore
+            for(var i = 0; i < oreList.length; i++) {
+               if(oreList[i].item.count >= cost) {
+                  oreList[i].item.count = oreList[i].item.count - cost;
+                  cost = 0;
+               }
+               else {
+                  cost = cost - oreList[i].item.count;
+                  oreList[i].item.count = 0;
+                  
+               }
+               if(oreList[i].item.count <= 0) {
+                  map.items.splice(oreList[i].index, 1);
+               }
+               if(cost <= 0) {
                   break;
                }
             }
-            if(item == undefined) {
-               map.items.push({ x: target.x, y: target.y, count: mined });
+            // Create Building
+            var building = { type: pawn.command.buildingType, x: target.x, y: target.y, owner: pawn.owner };
+
+            if(building == "solar1") {
+               building.view   = 1;
+               building.health = 10;
             }
-            else {
-               item.count = item.count + mined;
-            }
+            map.buildings.push(building);
+
          }
       }
 
@@ -386,7 +476,6 @@ setInterval(function() {
    // Send Results
    clients.forEach(function(client) {
       if(client.loggedIn) {
-         var myPawnList = [];
          var viewSet = [];
          var vision = [];
          var clientMessage = {
@@ -395,16 +484,23 @@ setInterval(function() {
             serverTickMS: serverTickMS,
             vision: vision
          };
-         map.pawns.forEach(function(pawn) {
+
+         for(k = 0; k < map.pawns.length; k++) {
+            var pawn = map.pawns[i];
             if(pawn.owner == client.user) {
-               myPawnList.push(pawn);
+               var rect = viewToRect(pawn.x, pawn.y, pawn.view);
+               addAreaToSet(viewSet, listAllInArea(rect.x, rect.y, rect.width, rect.height));
+
             }
-         });
-         //console.log(myPawnList);
-         myPawnList.forEach(function(pawn) {
-            var rect = viewToRect(pawn.x, pawn.y, pawn.view);
-            addAreaToSet(viewSet, listAllInArea(rect.x, rect.y, rect.width, rect.height));
-         });
+         }
+         for(k = 0; k < map.buildings.length; k++) {
+            var building = map.buildings[i];
+            if(building.owner == client.user) {
+               var rect = viewToRect(building.x, building.y, building.view);
+               addAreaToSet(viewSet, listAllInArea(rect.x, rect.y, rect.width, rect.height));
+            }
+         }
+
 
          viewSet.forEach(function (ele) {
             var thisCoordObj = { x: ele.x, y: ele.y, type : ele.type };
@@ -426,7 +522,16 @@ setInterval(function() {
             }
             else if(ele.type == "item") {
                thisCoordObj.item = {
+                  type:  ele.item.type,
                   count: ele.item.count
+               };
+            }
+            else if(elel.type == "building") {
+               thisCoordObj.building = {
+                  type:      ele.building.type,
+                  view:      ele.building.view,
+                  health:    ele.building.health,
+                  ownerName: ele.building.owner.username
                };
             }
             

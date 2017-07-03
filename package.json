@@ -1,0 +1,19 @@
+{
+  "name": "botwars",
+  "version": "1.0.0",
+  "description": "A MMORTS that is designed to be controlled by bots",
+  "main": "main.js",
+  "dependencies": {
+    "carrier": "^0.3.0",
+    "shortid": "^2.2.8"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "MMORTS"
+  ],
+  "author": "Ryan Hanson",
+  "license": "GPL-3.0"
+}
