@@ -90,13 +90,19 @@ var server = net.createServer(function(socket) {
                else if(cmd.type == "pickup") {
                   var pawn = findPawnById(cmd.pawnId);
                   if(pawn != undefined) {
-                     pawn.command = { type: "pickup" };
+                     pawn.command = { type: "pickup", amount: cmd.amount };
                   }
                }
                else if(cmd.type == "drop") {
                   var pawn = findPawnById(cmd.pawnId);
                   if(pawn != undefined) {
-                     pawn.command = { type: "drop" };
+                     pawn.command = { type: "drop", amount: cmd.amount };
+                  }
+               }
+               else if(cmd.type == "charge") {
+                  var pawn = findPawnById(cmd.pawnId);
+                  if(pawn != undefined) {
+                     pawn.command = { type: "charge" };
                   }
                }
                else if(cmd.type == "mine") {
@@ -591,6 +597,111 @@ setInterval(function() {
                                    command: { type: "none" } });
                }
                pawn.charge = pawn.charge - actionCosts.activate;
+            }
+         }
+      }
+      else if(pawn.command.type == "pickup") {
+         if(pawn.storageCount < pawn.storageMax) {
+            var offset = facingOffset(pawn.facing);
+            var target = {
+               x: pawn.x + offset.x,
+               y: pawn.y + offset.y
+            };
+            var eles = listAllInArea(target.x, target.y, 1, 1);
+            var itemEle = undefined;
+            for(var k = 0; k < eles.length; k ++) {
+               if(eles[k].type == "item" ) {
+                  itemEle = eles[k];
+                  break;
+               }
+            }
+
+            if(itemEle != undefined && (
+               pawn.storageType == itemEle.item.type || 
+               pawn.storageCount == 0)) {
+               pawn.storageType = itemEle.item.type;
+               var xfer = pawn.command.amount;
+               if(xfer + pawn.storageCount > pawn.storageMax) {
+                  xfer = pawn.storageMax - pawn.storageCount;
+               }
+               if(xfer > itemEle.item.count) {
+                  xfer = itemEle.item.count;
+               }
+               if(xfer > 0) {
+                  if(pawn.charge < actionCosts.pickup) {
+                     pawn.charge = 0;
+                  }
+                  else {
+                     pawn.storageCount = pawn.storageCount + xfer;
+                     itemEle.item.count = itemEle.item.count - xfer;
+
+                     if(itemEle.item.count <= 0) {
+                        map.items.splice(itemEle.index, 1);
+                     }
+                     pawn.charge = pawn.charge - actionCosts.pickup;
+                  }
+               }
+            }
+         }
+      }
+      else if(pawn.command.type == "drop") {
+         if(pawn.storageCount > 0) {
+            var offset = facingOffset(pawn.facing);
+            var target = {
+               x: pawn.x + offset.x,
+               y: pawn.y + offset.y
+            };
+            var eles = listAllInArea(target.x, target.y, 1, 1);
+            var itemEle = undefined;
+            for(var k = 0; k < eles.length; k ++) {
+               if(eles[k].type == "item" ) {
+                  itemEle = eles[k];
+                  break;
+               }
+            }
+
+            var xfer = pawn.command.amount;
+            if(pawn.storageCount < xfer) {
+               xfer = pawn.storageCount;
+            }
+            if(itemEle == undefined) {
+               if(pawn.charge < actionCosts.drop) {
+                  pawn.charge = 0;
+               }
+               else {
+                  map.items.push({ x: target.x, y: target.y, 
+                                   type: pawn.storageType, count: xfer });
+                  pawn.storageCount = pawn.storageCount - xfer;
+                  pawn.charge = pawn.charge - actionCosts.drop;
+               }
+            }
+            if(pawn.storageType == itemEle.item.type) {
+               if(pawn.charge < actionCosts.drop) {
+                  pawn.charge = 0;
+               }
+               else {
+                  itemEle.item.count = itemEle.item.count + xfer;
+                  pawn.storageCount = pawn.storageCount - xfer;
+                  pawn.charge = pawn.charge - actionCosts.drop;
+
+               }
+            }
+            if(pawn.storageCount <= 0) {
+               pawn.storageType = "none";
+            }
+         }
+      }
+      else if(pawn.command.type == "charge") {
+         if(pawn.storageType == "battery") {
+            var xfer = pawn.chargeMax - pawn.charge;
+            if(xfer > pawn.storageCount)
+            {
+               xfer = pawn.storageCount;
+            }
+            pawn.charge = pawn.charge + xfer;
+            pawn.storageCount = pawn.storageCount - xfer;
+            if(pawn.storageCount <= 0) {
+               pawn.storageType = "none";
             }
          }
       }
