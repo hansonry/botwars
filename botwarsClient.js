@@ -14,18 +14,28 @@ function viewToRect(x, y, view) {
 function BotwarsTurn(msg, socket) {
    var self = this;
    this.raw = msg;
-   this.myPawns     = [];
-   this.myBuildings = [];
+   this.myPawns        = [];
+   this.otherPawns     = [];
+   this.myBuildings    = [];
+   this.otherBuildings = [];
    msg.vision.forEach(function(spot) {
-      if(spot.type == "pawn" && 
-         spot.pawn.ownerName == msg.username) {
+      if(spot.type == "pawn") {          
          var pawn = Object.assign({x: spot.x, y: spot.y}, spot.pawn);
-         self.myPawns.push(pawn);
+         if(spot.pawn.ownerName == msg.username) {
+            self.myPawns.push(pawn);
+         }
+         else {
+            slef.otherPawns.push(pawn);
+         }
       }
-      else if(spot.type == "building" && 
-              spot.building.ownerName == msg.username) {
+      else if(spot.type == "building") { 
          var building = Object.assign({x: spot.x, y: spot.y}, spot.building);
-         self.myBuildings.push(building);
+         if(spot.building.ownerName == msg.username) {
+            self.myBuildings.push(building);
+         }
+         else {
+            self.otherBuildings.push(building);
+         }
       }
    });
 
@@ -127,6 +137,18 @@ function BotwarsTurn(msg, socket) {
          }
       }
       return count;
+   }
+   this.listPawns = function(x, y, width, height) {
+      var pawns = [];
+      for(var i = 0; i < msg.vision.length; i++) {
+         var vis = msg.vision[i];
+         if(vis.type == "pawn" && vis.x >= x && vis.y >= y &&
+            vis.x < x + width && vis.y < y + height) {
+            var pawn = Object.assign({x: vis.x, y: vis.y}, vis.pawn);
+            pawns.push(pawn);
+         }
+      }
+      return pawns;
    }
 }
 

@@ -20,6 +20,13 @@ client.on('turn', function(turn) { // This is called every time the server sends
 
 The above code just spins around pawn 0 until it runs out of power
 
+## Turn Class public attributes
+
+* myPawns        - A list of pawns that you own
+* otherPawns     - A list of pawns that you dont own
+* myBuildings    - A list of buildings you own
+* otherBuildings - A list of buildings you dont own
+
 ## Turn Class functions
 
 * pawnRotateRight(pawnID)           - Turns the specified pawn right
@@ -38,7 +45,7 @@ The above code just spins around pawn 0 until it runs out of power
 * clearCommands()                   - This clears all commands
 * oreCount(x, y, width, height)     - This counts all the ore in the specified area
 * batteryCount(x, y, width, height) - This counts all the batteries in the specified area 
-
+* listPawns(x, y, width, height)    - This returns a list of all pawns in the specified rectangle
 
 
 Note: pawnID is not the pawn index. There is no gaurentee of the order of anything being sent over from the server.
