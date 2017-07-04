@@ -262,7 +262,7 @@ function listAllInArea(x, y, width, height) {
       var pawn = map.pawns[i];
       if(pawn.x >= x && pawn.y >= y &&
          pawn.x < x + width && pawn.y < y + height) {
-         list.push({ type:"pawn", x: pawn.x, y: pawn.y, index: i, pawn: pawn });
+         list.push({ type: "pawn", x: pawn.x, y: pawn.y, index: i, pawn: pawn });
       }
    }
 
@@ -270,7 +270,7 @@ function listAllInArea(x, y, width, height) {
       var terr = map.terrain[i];
       if(terr.x >= x && terr.y >= y &&
          terr.x < x + width && terr.y < y + height) {
-         list.push({ type:"terrain", x: terr.x, y: terr.y, index: i, terrain: terr });
+         list.push({ type: "terrain", x: terr.x, y: terr.y, index: i, terrain: terr });
       }
    }
 
@@ -384,16 +384,30 @@ setInterval(function() {
          }
       }
       else if(pawn.command.type == "move") {
-         if(pawn.charge < actionCosts.move) {
-            pawn.charge = 0;
-         }
-         else {
-            var offset = facingOffset(pawn.facing);
-            pawn.x = pawn.x + offset.x;
-            pawn.y = pawn.y + offset.y;
-            pawn.charge = pawn.charge - actionCosts.move;
+         var offset = facingOffset(pawn.facing);
+         var target = {
+            x: pawn.x + offset.x,
+            y: pawn.y + offset.y
+         };
+         var blocked = false;
+         var eles = listAllInArea(target.x, target.y, 1, 1);
+         for(var k = 0; k < eles.length; k ++) {
+            if(eles[k].type == "pawn" || 
+               (eles[k].type == "terrain" && eles[k].terrain.type == "wall")) {
+               blocked = true;
+            }
          }
 
+         if(blocked == false) {
+            if(pawn.charge < actionCosts.move) {
+               pawn.charge = 0;
+            }
+            else {
+               pawn.x = target.x;
+               pawn.y = target.y;
+               pawn.charge = pawn.charge - actionCosts.move;
+            }
+         }
       }
       else if(pawn.command.type == "mine") {
          var offset = facingOffset(pawn.facing);
