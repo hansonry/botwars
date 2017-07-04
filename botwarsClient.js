@@ -64,6 +64,14 @@ function BotwarsTurn(msg, socket) {
       command.commands.push({ type: "charge", pawnId: id });
    }
 
+   this.pawnAttack = function(id) {
+      command.commands.push({ type: "attack", pawnId: id });
+   }
+
+   this.pawnSetNotes = function(id, notes) {
+      command.commands.push({ type: "setNotes", pawnId: id, notes: notes });
+   }
+
    this.sendCommands = function() {
       socket.write(JSON.stringify(command) + "\n");
    }

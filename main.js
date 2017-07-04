@@ -63,7 +63,7 @@ var server = net.createServer(function(socket) {
             objMsg.commands.forEach(function (cmd) {
                if(cmd.type == "rotate") {
                   var pawn = findPawnById(cmd.pawnId);
-                  if(pawn != undefined) {
+                  if(pawn != undefined && pawn.owner == thisClient.user) {
                      if(cmd.direction == "left") {
                         pawn.command = { type: "rotate", direction: "left" };
                      }
@@ -77,50 +77,62 @@ var server = net.createServer(function(socket) {
                }
                else if(cmd.type == "move") {
                   var pawn = findPawnById(cmd.pawnId);
-                  if(pawn != undefined) {
+                  if(pawn != undefined && pawn.owner == thisClient.user) {
                      pawn.command = { type: "move" };
                   }
                }
                else if(cmd.type == "none") {
                   var pawn = findPawnById(cmd.pawnId);
-                  if(pawn != undefined) {
+                  if(pawn != undefined && pawn.owner == thisClient.user) {
                      pawn.command = { type: "none" };
                   }
                }
                else if(cmd.type == "pickup") {
                   var pawn = findPawnById(cmd.pawnId);
-                  if(pawn != undefined) {
+                  if(pawn != undefined && pawn.owner == thisClient.user) {
                      pawn.command = { type: "pickup", amount: cmd.amount };
                   }
                }
                else if(cmd.type == "drop") {
                   var pawn = findPawnById(cmd.pawnId);
-                  if(pawn != undefined) {
+                  if(pawn != undefined && pawn.owner == thisClient.user) {
                      pawn.command = { type: "drop", amount: cmd.amount };
                   }
                }
                else if(cmd.type == "charge") {
                   var pawn = findPawnById(cmd.pawnId);
-                  if(pawn != undefined) {
+                  if(pawn != undefined && pawn.owner == thisClient.user) {
                      pawn.command = { type: "charge" };
                   }
                }
                else if(cmd.type == "mine") {
                   var pawn = findPawnById(cmd.pawnId);
-                  if(pawn != undefined) {
+                  if(pawn != undefined && pawn.owner == thisClient.user) {
                      pawn.command = { type: "mine" };
                   }
                }
                else if(cmd.type == "build") {
                   var pawn = findPawnById(cmd.pawnId);
-                  if(pawn != undefined) {
+                  if(pawn != undefined && pawn.owner == thisClient.user) {
                      pawn.command = { type: "build", buildingType: cmd.buildingType };
                   }
                }
                else if(cmd.type == "activate") {
                   var pawn = findPawnById(cmd.pawnId);
-                  if(pawn != undefined) {
+                  if(pawn != undefined && pawn.owner == thisClient.user) {
                      pawn.command = { type: "activate" };
+                  }
+               }
+               else if(cmd.type == "attack") {
+                  var pawn = findPawnById(cmd.pawnId);
+                  if(pawn != undefined && pawn.owner == thisClient.user) {
+                     pawn.command = { type: "attack" };
+                  }
+               }
+               else if(cmd.type == "setNotes") {
+                  var pawn = findPawnById(cmd.pawnId);
+                  if(pawn != undefined && pawn.owner == thisClient.user) {
+                     pawn.notes = cmd.notes;
                   }
                }
             });
@@ -141,7 +153,7 @@ var server = net.createServer(function(socket) {
             map.pawns.push({id: shortid.generate(), owner: thisUser, x:0, y:0, 
                facing: "north", health:10, view:2, storageType: "none", 
                storageCount: 0, storageMax: 100, charge: 100, chargeMax: 100, 
-               command: { type: "none" } });
+               dammage: 2, notes: {}, command: { type: "none" } });
             //console.log(map.pawns);
          }
          else if(objMsg.type == "signIn") {
@@ -177,33 +189,6 @@ var server = net.createServer(function(socket) {
 console.log("Server started at port 8000");
 
 
-function CreateSightArray(coords, radius) {
-   if(radius <= 0) {
-      return [{x: coords.x, y: coords.y}];
-   }
-   else {
-      var points = [];
-      var min = {x: coords.x - radius, y: coords.y - radius};
-      var size = radius * 2 + 1;
-      for(var x = min.x; x < min.x + size; x ++) {
-         for(var y = min.y; y < min.y + size; y ++) {
-            points.push({x: x, y: y});
-         }
-      }
-      return points;
-   }
-}
-
-function AddCoordSet(array, coordsList) {
-   coordsList.forEach(function (coord) {
-      var obj = array.find(function (ele) {
-         return ele.x == coord.x && ele.y == coord.y;
-      });
-      if(obj == undefined) {
-         array.push(coord);
-      }
-   });
-}
 
 function rotate(facing, direction) {
    var result = facing;
@@ -387,7 +372,6 @@ setInterval(function() {
 
 
    // Proccess State
-
    for(var i = 0; i < map.pawns.length; i++) {
       var pawn = map.pawns[i];
       if(pawn.command.type == "rotate") {
@@ -593,8 +577,8 @@ setInterval(function() {
                                    x: building.x, y: building.y, 
                                    facing: pawn.facing, health:10, view:2, 
                                    storageType: "none", storageCount: 0,
-                                   storageMax: 100, charge: 100, chargeMax: 100, 
-                                   command: { type: "none" } });
+                                   storageMax: 100, charge: 100, chargeMax: 100,
+                                   dammage: 2, notes: {},  command: { type: "none" } });
                }
                pawn.charge = pawn.charge - actionCosts.activate;
             }
@@ -705,6 +689,34 @@ setInterval(function() {
             }
          }
       }
+      else if(pawn.command.type == "build") {
+         var offset = facingOffset(pawn.facing);
+         var target = {
+            x: pawn.x + offset.x,
+            y: pawn.y + offset.y
+         };
+         var eles = listAllInArea(target.x, target.y, 1, 1);
+         var targetBuilding = undefined;
+         var targetPawn     = undefined;
+
+         for(var k = 0; k < eles.length; k++) {
+            if(eles[k].type == "building") {
+               targetBuilding = eles[k];
+            }
+            else if(eles[k].type == "pawn") {
+               targetPawn = eles[k];
+            }
+         }
+
+         if(targetPawn != undefined && 
+            targetPawn.pawn.health > 0) {
+            targetPawn.pawn.health = targetPawn.pawn.health - pawn.dammage;
+         }
+         else if(targetBuilding != undefined && 
+                 targetBuilding.building.health > 0) {
+            targetBuilding.building.health = targetBuilding.building.health - pawn.dammage;
+         }
+      }
 
       pawn.command = {type: "none"};
 
@@ -723,6 +735,22 @@ setInterval(function() {
             item.count = item.count - itemDecayRate;
          }
 
+      }
+   }
+
+   // Clean up dead Panws
+   for(var i = map.pawns.length - 1; i >= 0; i --) {
+      var pawn = map.pawns[i];
+      if(pawn.health <= 0) {
+         map.pawns.splice(i, 1);
+      }
+   }
+
+   // Clean up dead Buildings
+   for(var i = map.buildings.length - 1; i >= 0; i --) {
+      var building = map.buildings[i];
+      if(building.health <= 0) {
+         map.buildings.splice(i, 1);
       }
    }
 
@@ -768,7 +796,8 @@ setInterval(function() {
                   storageCount: ele.pawn.storageCount,
                   storageMax:   ele.pawn.storageMax,
                   charge:       ele.pawn.charge,
-                  chargeMax:    ele.pawn.chargeMax
+                  chargeMax:    ele.pawn.chargeMax,
+                  notes:        ele.pawn.notes
                };               
             }
             else if(ele.type == "ore") {
