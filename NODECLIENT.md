@@ -31,11 +31,14 @@ The above code just spins around pawn 0 until it runs out of power
 * pawnPickup(pawnID, amount)        - Attempt to pickup items that the pawn is facing tward
 * pawnDrop(pawnID, amount)          - Attempt to drop items at the location the pawn is facing
 * pawnCharge(pawnID)                - Attempt to charge the pawn using batters in its inventory
+* pawnAttack(pawnID)                - Attack the direction facing. Friendly fire is allowed
+* pawnSetNotes(pawnID, notes)       - Set notes for the current pawn. This doesnt use up an action
 * sendCommands()                    - Sends all commands to the server. If you dont call this nothing will be commanded
 * logCommands()                     - This writes all the commands to stdout
 * clearCommands()                   - This clears all commands
 * oreCount(x, y, width, height)     - This counts all the ore in the specified area
 * batteryCount(x, y, width, height) - This counts all the batteries in the specified area 
+
 
 
 Note: pawnID is not the pawn index. There is no gaurentee of the order of anything being sent over from the server.
