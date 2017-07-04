@@ -14,11 +14,18 @@ function viewToRect(x, y, view) {
 function BotwarsTurn(msg, socket) {
    var self = this;
    this.raw = msg;
-   this.myPawns = [];
+   this.myPawns     = [];
+   this.myBuildings = [];
    msg.vision.forEach(function(spot) {
-      if(spot.type == "pawn" && spot.pawn.ownerName == msg.username) {
+      if(spot.type == "pawn" && 
+         spot.pawn.ownerName == msg.username) {
          var pawn = Object.assign({x: spot.x, y: spot.y}, spot.pawn);
          self.myPawns.push(pawn);
+      }
+      else if(spot.type == "building" && 
+              spot.building.ownerName == msg.username) {
+         var building = Object.assign({x: spot.x, y: spot.y}, spot.building);
+         self.myBuildings.push(building);
       }
    });
 
@@ -60,6 +67,9 @@ function BotwarsTurn(msg, socket) {
    this.sendCommands = function() {
       socket.write(JSON.stringify(command) + "\n");
    }
+   this.logCommands = function() {
+      console.log(JSON.stringify(command));
+   }
 
    this.clearCommands = function() {
       command.commands = [];
@@ -93,6 +103,18 @@ function BotwarsTurn(msg, socket) {
          if(vis.x >= x && vis.y >= y && 
             vis.x < x + width && vis.y < y + height &&
             vis.type == "item" && vis.item.type == "ore") {
+            count = count + vis.item.count;
+         }
+      }
+      return count;
+   }
+   this.batteryCount = function(x, y, width, height) {
+      var count = 0;
+      for(var i = 0; i < msg.vision.length; i++) {
+         var vis = msg.vision[i];
+         if(vis.x >= x && vis.y >= y && 
+            vis.x < x + width && vis.y < y + height &&
+            vis.type == "item" && vis.item.type == "battery") {
             count = count + vis.item.count;
          }
       }

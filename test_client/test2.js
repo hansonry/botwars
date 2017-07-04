@@ -1,5 +1,5 @@
 var net           = require('net'),
-    botwarsClient = require('./botwarsClient');
+    botwarsClient = require('../botwarsClient');
 
 
 var socket = net.createConnection(8000);
